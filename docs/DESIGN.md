@@ -97,3 +97,48 @@ Verworfen: Erzeugung beim Testlauf – der Pfad aus der Beispiel-Config wäre vo
 ### `grab_frame.py` startet nur die angeforderte Kamera
 
 So verzögern andere, gerade nicht erreichbare Kameras das Skript nicht. Das Warten auf das erste Bild liegt bewusst im Skript: Der Manager bietet nur nicht blockierende Abrufe an.
+
+## M2 – Detector und Imaging
+
+### Klassenfilter nach der Erkennung
+
+Der Detector liefert alle Treffer, `detect_in_frame` filtert, zählt und prüft Klassennamen. Fake und echtes Modell laufen so durch denselben Code, und jeder künftige Detector bekommt das Verhalten ohne eigene Implementierung. Unbekannte Klassen werden vor der Erkennung abgelehnt.
+
+Verworfen: Filter im Modellaufruf (`predict(classes=...)`). Das Netz läuft trotzdem vollständig, der Gewinn beschränkt sich auf die Nachbearbeitung, und jeder Detector müsste es selbst können.
+
+### Ultralytics von stdout fernhalten
+
+Der Logger von Ultralytics bindet sich beim Import an `sys.stdout`, meldet dort beim ersten Import das Anlegen seiner Einstellungsdatei, und auch der Fortschrittsbalken des Modell-Downloads schreibt nach stdout. Auf einem frischen Rechner würde das die MCP-Verbindung zerstören. `verbose=False` allein reicht also nicht.
+
+Import und Laden des Modells laufen deshalb in `redirect_stdout(sys.stderr)`. Der Logger bleibt dadurch dauerhaft an stderr gebunden. Bei der Erkennung selbst wird nicht umgeleitet, weil das prozessweit wirkt und im Server mit dem Protokollkanal kollidieren könnte; dort genügt `verbose=False`.
+
+Verworfen: Handler des Loggers nach dem Import austauschen – die Meldung beim ersten Import wäre dann schon auf stdout gelandet.
+
+### Netzwerkfunktionen von Ultralytics abschalten
+
+Ultralytics sendet bei jeder Erkennung Nutzungsstatistiken und kann fehlende Pakete selbst installieren. Für einen Server, der Kameras verarbeitet, ist beides unerwünscht. Vor dem ersten Import werden deshalb `YOLO_OFFLINE=true` und `YOLO_AUTOINSTALL=false` gesetzt. Laut Code bleibt der Modell-Download möglich, weil er `YOLO_OFFLINE` nur nach einem Fehlversuch auswertet.
+
+Verworfen: `settings.update({"sync": False})` – das würde die globale Ultralytics-Einstellungsdatei des Benutzers ändern und damit auch andere Projekte betreffen.
+
+### Lizenz: AGPL-3.0 von `ultralytics`
+
+Für einen privaten Prototyp unkritisch. Wird das Repo öffentlich, muss das Projekt entweder selbst unter AGPL-3.0 stehen oder einen anderen Detector verwenden. Genau dafür gibt es das `Detector`-Protokoll; `ultralytics` wird nur in `detector.py` importiert.
+
+### Bilder bleiben schreibgeschützt, Annotation kopiert
+
+`annotate()` arbeitet auf einer Kopie, weil Frames aus dem `CameraManager` geteilt und schreibgeschützt sind (siehe M1).
+
+### `frame_age_s` wird nach der Erkennung gemessen
+
+So zeigt der Wert, wie alt das Ergebnis ist, wenn der Aufrufer es erhält. Gerade auf der CPU kann die Erkennung einen spürbaren Teil dieses Alters ausmachen. `timestamp` ist dagegen der Aufnahmezeitpunkt des Bildes.
+
+### `zones` ist bis M4 leer
+
+Das Feld existiert schon, damit das Antwortformat aus KONZEPT.md Abschnitt 5 stabil bleibt. Befüllt wird es mit den Zonen in M4.
+
+### Beobachtung: erste Erkennung deutlich langsamer
+
+Einmalige Messung auf der CPU mit `yolo26n.pt` und dem synthetischen Testbild (320×240): erster Aufruf rund 1285 ms, die zehn folgenden im Median rund 23 ms. Das ist noch keine Evaluation, hat aber zwei Folgen:
+
+- **M3:** Der erste Tool-Aufruf nach dem Start wäre spürbar langsamer. Zu entscheiden ist, ob der Server beim Start einmal aufwärmt.
+- **M5:** Der Benchmark muss den ersten Aufruf getrennt erfassen, sonst verfälscht er Median und 95. Perzentil.

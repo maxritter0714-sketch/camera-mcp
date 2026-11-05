@@ -10,6 +10,7 @@ dependencies = [
     "pydantic>=2.7",
     "python-dotenv>=1.0",
     "pyyaml>=6.0",
+    "ultralytics>=8.4.202",
 ]
 
 [project.scripts]
@@ -30,7 +31,10 @@ packages = ["src/camera_mcp"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra"
+addopts = "-ra -m 'not integration'"
+markers = [
+    "integration: needs the real model; may download it (run with: pytest -m integration)",
+]
 
 [tool.ruff]
 line-length = 100

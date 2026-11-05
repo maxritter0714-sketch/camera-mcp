@@ -5,8 +5,6 @@ import sys
 import time
 from pathlib import Path
 
-import cv2
-
 from camera_mcp.camera_manager import (
     CameraManager,
     CameraOfflineError,
@@ -14,6 +12,7 @@ from camera_mcp.camera_manager import (
     UnknownCameraError,
 )
 from camera_mcp.config import AppConfig, ConfigError, load_config, resolve_config_path
+from camera_mcp.imaging import ImagingError, encode_jpeg
 from camera_mcp.logging_setup import setup_logging
 
 FIRST_FRAME_TIMEOUT_S = 15.0
@@ -45,12 +44,9 @@ def grab(config: AppConfig, camera_id: str) -> Frame:
 
 
 def save_jpeg(frame: Frame, path: Path, quality: int) -> None:
-    # Encoded to bytes first: cv2.imwrite cannot handle non-ASCII paths on Windows.
-    ok, encoded = cv2.imencode(".jpg", frame.image, [cv2.IMWRITE_JPEG_QUALITY, quality])
-    if not ok:
-        raise RuntimeError("JPEG encoding failed")
+    data = encode_jpeg(frame.image, quality)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(encoded.tobytes())
+    path.write_bytes(data)
 
 
 def main() -> int:
@@ -67,7 +63,7 @@ def main() -> int:
         config = load_config(resolve_config_path())
         frame = grab(config, args.camera)
         save_jpeg(frame, output, config.limits.jpeg_quality)
-    except (ConfigError, UnknownCameraError, CameraOfflineError, OSError) as exc:
+    except (ConfigError, UnknownCameraError, CameraOfflineError, ImagingError, OSError) as exc:
         print(exc, file=sys.stderr)
         return 1
 
