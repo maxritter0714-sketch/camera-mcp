@@ -48,3 +48,52 @@ Ob eine Dateiquelle existiert, prüft die Konfiguration nicht: Zur Laufzeit erre
 ### Logging nur auf stderr
 
 `setup_logging()` ersetzt alle Root-Handler durch einen stderr-Handler, weil stdout der MCP-Protokollkanal ist. Ein Subprozess-Test prüft, dass `main()` nichts auf stdout schreibt. Zusätzlich verbietet die Ruff-Regel `T20` `print()` außerhalb von `scripts/`.
+
+## M1 – FrameSources und CameraManager
+
+### Die Quelle bremst Videodateien, nicht der Manager
+
+`read()` blockiert, bis das nächste Bild fällig ist, bei Videodateien also passend zu deren FPS. Eine Datei verhält sich damit wie eine Kamera, der Manager bleibt quellenneutral, und `fps_measured` stimmt.
+
+Verworfen:
+
+- **Einheitliche Bremse im Manager:** Bei echten Kameras würde sie den OpenCV-Puffer volllaufen lassen und genau die veralteten Bilder erzeugen, die der Hintergrund-Thread verhindern soll (KONZEPT.md Abschnitt 8).
+- **Keine Bremse:** Volle CPU-Last und unrealistische FPS, was die Evaluation verfälschen würde.
+
+### Getrennte Klassen für Video- und Bilddateien
+
+`make_source` wählt anhand der Dateiendung zwischen `VideoFileFrameSource` und `ImageFileFrameSource`. Beide haben keine gemeinsame Lese-Logik, weil ein Bild einmal dekodiert und ein Video laufend gelesen wird.
+
+Verworfen: eine `FileSource` mit Fallunterscheidung in jeder Methode.
+
+### `online`/`offline` aus dem Bildalter ableiten
+
+Der Status wird beim Abruf aus `max_frame_age_s` berechnet und nicht vom Thread gesetzt. Das erfasst auch den schwierigsten Fall: Ein Stream, der in einem blockierenden `read()` hängt, kann selbst nichts mehr melden. OpenCV bricht dort erst nach einem eigenen Timeout ab.
+
+Verworfen: Statusvariable, die der Capture-Thread pflegt – sie bliebe genau in diesem Fall auf `online` stehen.
+
+### Fehlerarten der Quellen
+
+`SourceError` bedeutet „vielleicht wieder verfügbar“ und führt zum Reconnect nach `reconnect_interval_s`. `SourceEnded` bedeutet „endgültig zu Ende“ (`loop: false`) und beendet den Thread: Ein Reconnect würde die Datei neu starten, also doch eine Schleife ergeben. Die Kamera wird danach über das Bildalter offline.
+
+Andere Ausnahmen fängt der Thread ebenfalls ab, weil ein Kamerafehler den Server nie beenden darf. Von ihnen wird nur der Typ geloggt, da ihr Text Stream-URLs mit Zugangsdaten enthalten könnte.
+
+### Bilder sind schreibgeschützt
+
+Der Manager setzt `writeable = False` auf jedes Bild, weil mehrere Aufrufer dasselbe Array teilen. Annotation (M2) muss kopieren. Ein Versehen ergibt so einen Fehler statt eines still veränderten Bildes.
+
+Verworfen: Kopie bei jedem Abruf – kostet bei jedem Tool-Aufruf Speicher und Zeit, auch wenn niemand schreibt.
+
+### Stoppen wartet begrenzt
+
+`stop()` wartet höchstens `STOP_TIMEOUT_S`. Ein in OpenCV hängender Thread lässt sich nicht von außen beenden; deshalb sind die Threads Daemons und werden mit einer Warnung zurückgelassen, statt das Beenden des Servers zu blockieren.
+
+### Synthetische Fixtures eingecheckt
+
+`scripts/generate_fixtures.py` erzeugt `tests/fixtures/sample.mp4` und `sample.png` (bewegtes Rechteck, keine echten Aufnahmen). Sie liegen im Repo, weil `config.example.yaml` auf `sample.mp4` verweist und die Tests offline laufen müssen.
+
+Verworfen: Erzeugung beim Testlauf – der Pfad aus der Beispiel-Config wäre vor dem ersten Testlauf ungültig.
+
+### `grab_frame.py` startet nur die angeforderte Kamera
+
+So verzögern andere, gerade nicht erreichbare Kameras das Skript nicht. Das Warten auf das erste Bild liegt bewusst im Skript: Der Manager bietet nur nicht blockierende Abrufe an.

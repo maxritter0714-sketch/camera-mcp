@@ -5,6 +5,8 @@ description = "MCP server exposing cameras as tools for AI clients."
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "numpy>=2.5.4",
+    "opencv-python>=5.0.0.93",
     "pydantic>=2.7",
     "python-dotenv>=1.0",
     "pyyaml>=6.0",
