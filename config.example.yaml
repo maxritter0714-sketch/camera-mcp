@@ -1,0 +1,27 @@
+detector:
+  model: yolo26n.pt          # replaceable, e.g. yolo26s.pt
+  device: auto               # auto | cuda | cpu
+  default_confidence: 0.4
+  imgsz: 640
+
+cameras:
+  - id: sample
+    name: Testvideo
+    source: {type: file, path: tests/fixtures/sample.mp4, loop: true}
+  - id: desk
+    name: Schreibtisch-Webcam
+    source: {type: webcam, index: 0}
+  - id: phone
+    name: Handy (IP-Kamera)
+    source: {type: rtsp, url: "${PHONE_STREAM_URL}"}   # from environment variable / .env
+
+zones:
+  phone:
+    - name: tuer
+      polygon: [[0.05, 0.10], [0.35, 0.10], [0.35, 0.98], [0.05, 0.98]]
+
+limits:
+  max_image_width: 1024
+  jpeg_quality: 80
+  max_frame_age_s: 5          # older = camera counts as offline
+  reconnect_interval_s: 5
