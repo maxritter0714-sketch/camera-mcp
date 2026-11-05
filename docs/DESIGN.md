@@ -142,3 +142,53 @@ Einmalige Messung auf der CPU mit `yolo26n.pt` und dem synthetischen Testbild (3
 
 - **M3:** Der erste Tool-Aufruf nach dem Start wäre spürbar langsamer. Zu entscheiden ist, ob der Server beim Start einmal aufwärmt.
 - **M5:** Der Benchmark muss den ersten Aufruf getrennt erfassen, sonst verfälscht er Median und 95. Perzentil.
+
+## M3 – MCP-Server
+
+### `mcp` 2.x statt 1.x (Abweichung vom ursprünglichen Konzept)
+
+KONZEPT.md nannte `from mcp.server.fastmcp import FastMCP, Image`. In der aktuellen Hauptversion heißt das `from mcp.server.mcpserver import MCPServer, Image`; das alte Modul existiert nicht mehr. Nach Rückfrage wurde 2.x gewählt und KONZEPT.md angepasst: Das Projekt beginnt gerade erst, ein späterer Umstieg wäre teurer, und v2 hält den Text unerwarteter Fehler von Haus aus vom Client fern.
+
+Verworfen: `mcp<2` festnageln – exakt wie spezifiziert, aber der Start auf einer alten Hauptversion.
+
+### Synchrone Tool-Funktionen
+
+Das SDK führt synchrone Tools in einem Worker-Thread aus. Erkennung und JPEG-Encoding blockieren den Protokollkanal also nicht, ohne dass der Code sich darum kümmern muss. Die Detector-Aufrufe serialisiert weiterhin das Lock im `UltralyticsDetector`.
+
+Verworfen: `async`-Tools mit eigener Thread-Auslagerung – der ursprüngliche Plan, im SDK aber überflüssig.
+
+### Aufwärmen beim Start
+
+Der Lifespan führt einmal eine Erkennung auf einem leeren Bild aus. Der erste echte `detect_objects`-Aufruf dauerte in einer Einzelmessung (CPU, über MCP) danach rund 79 ms statt der rund 1,3 s für die erste Erkennung aus M2; die folgenden zehn lagen im Median bei rund 38 ms. Die Verbindung stand nach rund 4,7 s.
+
+Das geht über die Spezifikation hinaus, ändert aber keine Tools oder Parameter und wurde vorab abgestimmt.
+
+Verworfen: kein Aufwärmen – der Start wäre kürzer, aber ausgerechnet der erste Aufruf des Modells deutlich langsamer.
+
+### Lifespan und Serverobjekt
+
+`create_server(make_detector)` baut den Server, damit Tests einen Fake-Detector einsetzen können. Das modulweite `mcp` braucht `mcp dev`, das den Server über den Namen findet und `main()` nicht aufruft. Config, Modell und Kameras werden deshalb erst im Lifespan geladen; ein Import von `server.py` lädt nichts davon.
+
+`main()` prüft die Config zusätzlich vorab und beendet den Prozess bei Config- oder Modellfehlern mit Exit-Code 1 und einer Meldung auf stderr.
+
+### Fehler
+
+`CameraError`, `DetectorError` und `ImagingError` werden zu `ToolError` mit lesbarer Meldung. Unerwartete Ausnahmen behandelt das SDK als Absturz: Das Modell sieht nur `Error executing tool <name>`, die Details gehen ins Log.
+
+Eine Offline-Kamera ist bei `get_camera_info` ein Status und kein Fehler, weil genau dieses Tool den Zustand melden soll. `get_frame` und `detect_objects` geben dagegen eine Fehlermeldung mit Bildalter zurück, weil sie kein aktuelles Ergebnis liefern können.
+
+### Antwortformat
+
+`get_camera_info` gibt ein Pydantic-Modell zurück, das SDK liefert dazu strukturierte Inhalte. `get_frame` und `detect_objects` geben Text und optional Bild zurück (`structured_output=False`), weil sich beides nicht in einem Schema ausdrücken lässt. Die JSON-Antwort von `detect_objects` steht als Text im ersten Block.
+
+`max_width` wird still auf `max_image_width` begrenzt (KONZEPT.md Abschnitt 5). Die tatsächlich gelieferte Breite steht in der Antwort.
+
+### Start aus Claude Desktop über `uv --directory`
+
+Claude Desktop legt das Arbeitsverzeichnis nicht fest. `uv --directory <projektordner> run camera-mcp` setzt es auf den Projektordner, sodass `config.yaml`, `.env` und die Modelldatei ohne Codeänderung gefunden werden. Damit ist die offene Frage aus M2 zum Ablageort des Modells gelöst.
+
+Verworfen: Modellpfad relativ zur Config auflösen – mehr Code für einen Fall, den der Startbefehl bereits abdeckt.
+
+### Beschreibungen gegen KONZEPT.md getestet
+
+Die Tool-Beschreibungen sind Teil des Designs (CLAUDE.md, Regel 6). `test_tools.py` liest sie aus KONZEPT.md Abschnitt 5 und vergleicht sie mit dem, was ein echter Client sieht. Ändert sich eines von beiden, schlägt der Test fehl. Das hilft auch beim Vorher-Nachher-Vergleich der Beschreibungen in M5.

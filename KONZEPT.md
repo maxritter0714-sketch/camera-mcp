@@ -39,7 +39,7 @@ Claude Desktop / Claude Code  (MCP-Client)
         │  stdio (lokal)  bzw.  stdio über SSH/Tailscale (Server)
         ▼
 ┌──────────────────────── camera-mcp ─────────────────────────┐
-│ server.py   FastMCP, Lifespan, 4 Tools                      │
+│ server.py   MCPServer, Lifespan, 4 Tools                    │
 │     │                                                        │
 │     ├── CameraManager ── FrameSource (webcam | rtsp | file)  │
 │     │     Hintergrund-Thread je Kamera, hält nur das         │
@@ -71,7 +71,7 @@ Claude Desktop / Claude Code  (MCP-Client)
 |---|---|---|
 | Sprache | Python 3.12 | |
 | Paketverwaltung | uv (mit `uv.lock`) | reproduzierbar auf jedem Rechner |
-| MCP | offizielles Python-SDK, Paket `mcp` (FastMCP) | `from mcp.server.fastmcp import FastMCP, Image` |
+| MCP | offizielles Python-SDK, Paket `mcp` 2.x (MCPServer, früher FastMCP) | `from mcp.server.mcpserver import MCPServer, Image` |
 | Kamera | `opencv-python` | Webcam, RTSP, Video-Dateien |
 | Erkennung | `ultralytics`, Modell `yolo26n.pt` | Modellname konfigurierbar |
 | Konfiguration | `pydantic` + `PyYAML` | Validierung, klare Fehlermeldungen |
@@ -223,7 +223,7 @@ camera-mcp/
 │   ├── imaging.py          # Skalieren, JPEG, Annotation
 │   ├── schemas.py          # Antwortmodelle (Pydantic)
 │   ├── logging_setup.py    # Logging NUR auf stderr / Datei
-│   └── server.py           # FastMCP, Lifespan, Tools, main()
+│   └── server.py           # MCPServer, Lifespan, Tools, main()
 ├── scripts/
 │   ├── grab_frame.py       # Bild von einer Kamera speichern (ohne MCP)
 │   ├── detect_once.py      # Erkennung auf einem Bild/Frame (ohne MCP)

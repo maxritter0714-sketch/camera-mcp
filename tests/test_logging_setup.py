@@ -40,20 +40,6 @@ def run_main(config_path: Path) -> subprocess.CompletedProcess[str]:
     )
 
 
-def test_main_with_valid_config_exits_cleanly_without_stdout(tmp_path: Path) -> None:
-    config = tmp_path / "config.yaml"
-    config.write_text(
-        "cameras:\n  - {id: desk, name: Desk, source: {type: webcam, index: 0}}\n",
-        encoding="utf-8",
-    )
-
-    result = run_main(config)
-
-    assert result.returncode == 0
-    assert result.stdout == ""
-    assert "1 camera(s)" in result.stderr
-
-
 def test_main_with_invalid_config_reports_on_stderr_and_exits_nonzero(tmp_path: Path) -> None:
     config = tmp_path / "config.yaml"
     config.write_text("cameras: []\n", encoding="utf-8")
