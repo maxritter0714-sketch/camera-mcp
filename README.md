@@ -125,16 +125,12 @@ Installationsart von Claude Desktop.
 
 ## Beispieldialog
 
-Aus der Evaluation (`docs/eval_questions.md`), Claude Code mit `claude-opus-5-5`, gekürzt. Die
-Kameras sind Standbilder aus der lokalen Konfiguration.
+![Claude beantwortet über `count_in_zone` und `detect_objects`, ob die Maus auf dem Mauspad liegt](docs/img/demo.svg)
 
-**Frage:** Liegt auf dem Schreibtisch-Standbild die Maus auf dem Mauspad?
-
-> *Tools:* `get_camera_info` → `count_in_zone(desk_still, zone="mauspad", classes=["mouse"])` →
-> `detect_objects(desk_still)`
->
-> Ja, die Maus liegt auf dem Mauspad. Die Objekterkennung findet genau eine Maus (Konfidenz 0,90),
-> und sie liegt in der Zone „mauspad“. Das Bild selbst habe ich mir nicht angesehen.
+Ein echter Lauf in Claude Code mit `claude-opus-5-5` (`claude -p`, nur der Kamera-Server;
+als SVG aus dem Protokoll dargestellt, Tool-Ergebnisse zusammengefasst). Die Kameras sind
+Standbilder aus der lokalen Konfiguration. Ein zweites Beispiel aus der Evaluation
+(`docs/eval_questions.md`), gekürzt:
 
 **Frage:** Hängt im Gasthaus eine Uhr an der Wand?
 
@@ -145,7 +141,7 @@ Kameras sind Standbilder aus der lokalen Konfiguration.
 > runder Ring mit einer senkrechten Linie und einem Querbalken. Das sieht eher nach einem Kreuz
 > aus; Ziffern oder Zeiger sind nicht zu erkennen.
 
-Die erste Frage beantwortet Claude allein aus den JSON-Antworten (wenige hundert Bytes), bei der
+Die Frage im Bild beantwortet Claude allein aus den JSON-Antworten (wenige hundert Bytes), bei der
 zweiten erkennt es die falsche Erkennung und prüft das Bild. Ergebnisse über alle 15 Fragen:
 `docs/EVALUATION.md`, Abschnitt 4.
 
