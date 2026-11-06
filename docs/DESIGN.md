@@ -239,7 +239,7 @@ Verworfen:
 
 Die Zone wird vor der Erkennung geprüft. Eine unbekannte Zone liefert eine Fehlermeldung mit den Zonen der Kamera, oder den Hinweis, dass die Kamera keine hat, und kostet keine Inferenz. Eine unbekannte oder ausgefallene Kamera meldet sich mit derselben Fehlermeldung wie bei den anderen Tools.
 
-## M5 – Evaluation (in Arbeit)
+## M5 – Evaluation und Dokumentation
 
 ### Latenz über echtes MCP statt direkter Funktionsaufrufe
 
