@@ -9,7 +9,7 @@ Gliederung nach KONZEPT.md, Abschnitt 10. Messungen sind reproduzierbar mit
 | 2 | Antwortgröße | gemessen |
 | 3 | Erkennungsqualität | offen, wartet auf Testbilder mit Handzählung |
 | 4 | LLM-Aufgabenerfolg | offen, wartet auf Evaluationsfragen |
-| 5 | Robustheit | Fehlerfälle live geprüft; Stream-Abbruch und Reconnect live noch offen |
+| 5 | Robustheit | live geprüft, Fehlerfälle und Stream-Abbruch über HTTP und RTSP |
 
 ## Messaufbau
 
@@ -145,13 +145,32 @@ Durch Tests abgedeckt: `test_reconnects_after_lost_connection_and_closes_source`
 `test_stale_frame_makes_camera_offline`, `test_reconnects_after_failed_opens`,
 `test_stream_uses_ffmpeg_backend_and_reports_lost_connection`.
 
-Live noch offen: Handy über RTSP (`/h264_pcm.sdp`), App während des Betriebs stoppen und wieder
-starten. Festzuhalten sind:
+**Live-Test (2026-11-06).** Die Handy-App „IP Webcam“ wurde während des Betriebs gestoppt und nach
+etwa 20 s wieder gestartet, einmal über HTTP-MJPEG (`/video`) und einmal über RTSP mit H.264
+(`/h264_pcm.sdp`). Ein MCP-Client fragte dabei alle 0,25 s `get_camera_info` ab und rief bei jedem
+Statuswechsel `detect_objects` auf.
 
-- wann `get_camera_info` auf `offline` wechselt (erwartet: nach `max_frame_age_s` = 5 s)
-- wie lange es nach dem Neustart bis `online` dauert (erwartet: bis zu `reconnect_interval_s` = 5 s
-  plus Verbindungsaufbau)
-- ob der Server dabei stabil bleibt
+| Messgröße | HTTP-MJPEG | RTSP |
+|---|---|---|
+| Abbruch erkannt („lost connection to network stream“) | sofort | sofort |
+| Wechsel auf `offline` nach letztem Frame | 5,1 s | 5,2 s |
+| Meldung von `detect_objects` danach | „Camera 'phone' is offline, last frame 5 s ago. Check get_camera_info.“ | gleich |
+| Wieder `online` nach dem App-Start | ≤ ~5 s (Startzeit nicht genau bekannt) | ≥ 12 s (Nachricht „an“ 02:50:03, Reconnect 02:50:14,9) |
+| Server ansprechbar während des Ausfalls | ja, alle Aufrufe < 500 ms | ja, alle Aufrufe < 500 ms |
+
+**Befund RTSP:** Während die App aus war, blieb ein Verbindungsversuch 30 s lang hängen, bis das
+Standard-Timeout von OpenCV/FFmpeg griff („Stream timeout triggered after 30005 ms“). Erst danach
+und nach `reconnect_interval_s` folgte der nächste Versuch. Im ungünstigsten Fall dauert der
+Reconnect bei RTSP also rund 30 s + 5 s statt etwa 5 s. Die Tools bleiben davon unberührt, weil
+der Versuch im Kamera-Thread läuft; die Kamera bleibt in dieser Zeit nur länger `offline`.
+`sources.py` setzt bisher kein eigenes Timeout für das Öffnen.
+
+Weitere Beobachtungen:
+
+- Direkt nach einem Reconnect meldet `fps_measured` kurz zu wenig (0,7–1,1), weil das Messfenster
+  noch fast leer ist. Beim ersten RTSP-Aufbau kurz zu viel (96 fps), vermutlich durch einen Schwall
+  gepufferter Frames. Beides gleicht sich nach wenigen Sekunden aus.
+- Gescheiterte Verbindungsversuche erscheinen nur einmal im Log, nicht alle 5 s.
 
 ## Quellen
 
