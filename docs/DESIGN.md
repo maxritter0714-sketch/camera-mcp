@@ -268,3 +268,11 @@ Die Markdown-Ausgabe des Skripts enthält nur ASCII-Zeichen. Die Windows-Konsole
 ### Robustheit: keine neuen Tests, sondern Abgleich und Live-Prüfung
 
 Die Fehlerfälle aus KONZEPT.md Abschnitt 10.5 waren durch die Tests aus M1–M4 bereits abgedeckt. In `EVALUATION.md` steht pro Fall die Antwort, die der Server live über Claude Code gab, und der Test, der das Verhalten festhält. Der Stream-Abbruch wird zusätzlich live mit dem Handy über RTSP geprüft.
+
+### Feste Timeouts für Netzwerk-Streams
+
+`StreamFrameSource` öffnet Streams mit je 5 s Timeout für Öffnen und Lesen (`CAP_PROP_OPEN_TIMEOUT_MSEC`, `CAP_PROP_READ_TIMEOUT_MSEC`). Der Live-Test hat gezeigt, dass ohne diese Werte ein Verbindungsversuch zu einer ausgeschalteten RTSP-Kamera 30 s hängt, das Standard-Timeout von OpenCV/FFmpeg. Der Reconnect dauerte dadurch bis zu ~35 s statt ~5 s. Mit 5 s brechen vergebliche Versuche nach 5 s ab; der Abstand der Versuche liegt bei ~10 s (Messwerte in `EVALUATION.md`). 5 s passt zu `max_frame_age_s`: Ein Stream, der länger keine Bilder liefert, gilt ohnehin als offline. Das Lese-Timeout greift zusätzlich, wenn ein Stream offen bleibt, aber keine Daten mehr schickt.
+
+Verworfen:
+- eine Option in der Config: Für den Prototyp gibt es keinen Fall, der einen anderen Wert braucht; sie wäre ein Parameter über die Spezifikation hinaus.
+- kürzere Werte: Der erste Verbindungsaufbau über RTSP mit H.264 braucht im Test bis zu ~2 s; 5 s lässt genug Reserve für ein langsameres WLAN.

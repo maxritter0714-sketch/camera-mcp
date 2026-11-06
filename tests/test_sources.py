@@ -7,6 +7,7 @@ import pytest
 
 from camera_mcp.config import FileSource, RtspSource, WebcamSource
 from camera_mcp.sources import (
+    STREAM_TIMEOUT_MS,
     ImageFileFrameSource,
     SourceEnded,
     SourceError,
@@ -161,7 +162,7 @@ class FakeCapture:
         self.released = True
 
 
-def test_stream_uses_ffmpeg_backend_and_reports_lost_connection(
+def test_stream_uses_ffmpeg_backend_with_timeouts_and_reports_lost_connection(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     frame = np.zeros((4, 4, 3), dtype=np.uint8)
@@ -181,7 +182,19 @@ def test_stream_uses_ffmpeg_backend_and_reports_lost_connection(
         source.read()
     source.close()
 
-    assert calls == [(SECRET_URL, cv2.CAP_FFMPEG)]
+    timeout_ms = STREAM_TIMEOUT_MS
+    assert calls == [
+        (
+            SECRET_URL,
+            cv2.CAP_FFMPEG,
+            [
+                cv2.CAP_PROP_OPEN_TIMEOUT_MSEC,
+                timeout_ms,
+                cv2.CAP_PROP_READ_TIMEOUT_MSEC,
+                timeout_ms,
+            ],
+        )
+    ]
     assert "s3cret" not in str(excinfo.value)
     assert capture.released
 

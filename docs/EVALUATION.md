@@ -163,7 +163,20 @@ Standard-Timeout von OpenCV/FFmpeg griff („Stream timeout triggered after 3000
 und nach `reconnect_interval_s` folgte der nächste Versuch. Im ungünstigsten Fall dauert der
 Reconnect bei RTSP also rund 30 s + 5 s statt etwa 5 s. Die Tools bleiben davon unberührt, weil
 der Versuch im Kamera-Thread läuft; die Kamera bleibt in dieser Zeit nur länger `offline`.
-`sources.py` setzt bisher kein eigenes Timeout für das Öffnen.
+
+**Fix und Wiederholung.** `sources.py` setzt seitdem für Netzwerk-Streams 5 s als Timeout für
+Öffnen und Lesen (`CAP_PROP_OPEN_TIMEOUT_MSEC`, `CAP_PROP_READ_TIMEOUT_MSEC`). Derselbe Test mit RTSP,
+App diesmal etwa 60 s aus:
+
+| Messgröße | RTSP vorher | RTSP mit Timeout |
+|---|---|---|
+| Wechsel auf `offline` nach letztem Frame | 5,2 s | 5,1 s |
+| Dauer eines vergeblichen Verbindungsversuchs | 30,0 s | 5,0–5,1 s |
+| Abstand der Versuche (Timeout + `reconnect_interval_s`) | ~35 s | ~10 s |
+| Wieder `online` nach dem App-Start | ≥ 12 s | vor der Nachricht „an“ (Reconnect 02:54:45,3, Nachricht 02:54:48) |
+| Server ansprechbar während des Ausfalls | ja | ja, alle Aufrufe < 500 ms |
+
+Im ungünstigsten Fall dauert der Reconnect bei RTSP jetzt etwa 10 s plus Verbindungsaufbau.
 
 Weitere Beobachtungen:
 

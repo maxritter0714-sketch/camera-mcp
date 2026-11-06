@@ -16,6 +16,15 @@ Image = npt.NDArray[np.uint8]
 
 DEFAULT_FILE_FPS = 10.0
 IMAGE_SUFFIXES = frozenset({".bmp", ".jpeg", ".jpg", ".png", ".webp"})
+# Limits for opening and reading a network stream. OpenCV's default of 30 s let a single
+# reconnect attempt to an RTSP camera that is off hang for 30 s (see docs/EVALUATION.md).
+STREAM_TIMEOUT_MS = 5000
+_STREAM_PARAMS = [
+    cv2.CAP_PROP_OPEN_TIMEOUT_MSEC,
+    STREAM_TIMEOUT_MS,
+    cv2.CAP_PROP_READ_TIMEOUT_MSEC,
+    STREAM_TIMEOUT_MS,
+]
 
 
 class SourceError(Exception):
@@ -109,7 +118,9 @@ class StreamFrameSource(_CaptureFrameSource):
     """RTSP or HTTP stream. The URL may contain credentials and stays out of all messages."""
 
     def __init__(self, url: str) -> None:
-        super().__init__("network stream", lambda: cv2.VideoCapture(url, cv2.CAP_FFMPEG))
+        super().__init__(
+            "network stream", lambda: cv2.VideoCapture(url, cv2.CAP_FFMPEG, _STREAM_PARAMS)
+        )
 
 
 class VideoFileFrameSource(_CaptureFrameSource):
