@@ -307,7 +307,7 @@ Ergebnisse in `docs/EVALUATION.md`, Messungen reproduzierbar per `scripts/benchm
        "mcpServers": {
          "camera": {
            "command": "ssh",
-           "args": ["gpu", "cd ~/camera-mcp && ~/.local/bin/uv run camera-mcp"]
+           "args": ["<ssh-host>", "cd ~/camera-mcp && ~/.local/bin/uv run camera-mcp"]
          }
        }
      }
