@@ -179,3 +179,9 @@ Der Server schreibt nie auf stdout (das ist der Protokollkanal); Logs gehen nach
 Bilder werden nur im Arbeitsspeicher gehalten, nicht gespeichert. Kameras nur auf eigene Räume
 richten, keine öffentlichen Bereiche oder Nachbargrundstücke. Kein öffentlicher Zugriff auf den
 Server; er läuft lokal über stdio.
+
+## Lizenz
+
+AGPL-3.0-or-later, siehe [LICENSE](LICENSE). Grund ist die Abhängigkeit `ultralytics`, die selbst
+unter AGPL-3.0 steht. Der Detector ist über ein Protokoll austauschbar (`detector.py`); mit einem
+anders lizenzierten Modell wäre auch eine andere Lizenz möglich.
