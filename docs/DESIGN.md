@@ -203,3 +203,38 @@ Offen: die Abnahme in Claude Desktop nachholen, z. B. mit einer anderen Version 
 
 Verworfen: den Server als Desktop-Erweiterung verpacken, die die Store-Version lädt. Das wäre ein zusätzliches Paketformat außerhalb der Spezifikation, nur um einen Fehler des Clients zu umgehen.
 
+## M4 – Zonen und `count_in_zone`
+
+### Fußpunkt statt Box-Mittelpunkt
+
+Ein Objekt gehört zu einer Zone, wenn der Mittelpunkt der Unterkante seiner Box in ihr liegt (KONZEPT.md Abschnitt 5). Für die typische Frage „steht jemand in der Zone?“ ist der Bodenkontakt aussagekräftiger als die Bildmitte des Objekts. Eine Person vor einer Tür überdeckt die Tür im Bild fast immer, steht aber nur mit den Füßen in der davor gezeichneten Bodenfläche. Ein Test hält das fest: Eine Box, deren Mitte in der Zone liegt, die aber darunter steht, zählt nicht.
+
+Verworfen:
+- Box-Mittelpunkt: zählt Objekte, die nur ins Bild der Zone hineinragen.
+- Überlappungsanteil der Box: braucht einen zusätzlichen Schwellwert und ist für das Modell schwerer nachzuvollziehen.
+
+### Der Rand zählt zur Zone
+
+Punkte auf einer Kante oder Ecke liegen in der Zone, mit einer Toleranz von 1e-9. Eine Zone, die bis an den Bildrand gezeichnet ist, zählt so auch Objekte, deren Box den Rand berührt. Ultralytics beschneidet Boxen auf das Bild, der Fußpunkt liegt dann genau bei y = 1. Liegt ein Punkt auf der gemeinsamen Kante zweier benachbarter Zonen, gehört er zu beiden.
+
+Verworfen: Rand außerhalb – dann fielen gerade die Objekte am unteren Bildrand heraus, die der Kamera am nächsten sind.
+
+### Eigener Punkt-in-Polygon-Test
+
+`zones.py` prüft zuerst, ob der Punkt auf einer Kante liegt. Danach entscheidet Ray Casting nach der Gerade-Ungerade-Regel. Das sind wenige Zeilen reines Python, das Verhalten auf dem Rand steht fest, und die Randfälle aus dem Abnahmekriterium sind direkt testbar. Getestet sind Kanten, Ecken, schräge Kanten, ein konkaves Polygon, ein Strahl genau durch eine Ecke, der Bildrand und überlappende Zonen.
+
+Sich selbst kreuzende Polygone werden nicht abgelehnt. Die Gerade-Ungerade-Regel zählt dort überlappende Teile als außen. Ein Polygon ohne Fläche enthält nur seine Kanten. Beides geht nicht über die Prüfung der Config hinaus, die für M0 spezifiziert wurde.
+
+Verworfen:
+- `cv2.pointPolygonTest`: Es ist zwar schon installiert, rechnet aber mit float32. Ob ein Punkt auf dem Rand liegt, hinge dann von Rundungen ab.
+- `shapely`: eine neue Abhängigkeit für eine Funktion von 30 Zeilen.
+
+### Zonen auf der gerundeten Box
+
+`detect_in_frame` ordnet die Zonen nach dem Runden der Koordinaten zu. So passt die Zuordnung immer zu der Box, die das Modell in der Antwort sieht.
+
+### Antwort von `count_in_zone`
+
+`count_in_zone` ruft dieselbe Erkennung auf wie `detect_objects` und behält nur die Detektionen der Zone. `counts` gilt damit nur für die Zone. Die Antwort enthält nach Rückfrage neben den spezifizierten Feldern Zone, Zeitstempel, `counts` und Detektionen auch `camera_id` und `frame_age_s`. So passt sie zu `detect_objects`, und das Modell sieht, wie alt das Ergebnis ist. Ausgeliefert wird sie als strukturierte Ausgabe wie bei `get_camera_info`, weil kein Bild dazugehört.
+
+Die Zone wird vor der Erkennung geprüft. Eine unbekannte Zone liefert eine Fehlermeldung mit den Zonen der Kamera, oder den Hinweis, dass die Kamera keine hat, und kostet keine Inferenz. Eine unbekannte oder ausgefallene Kamera meldet sich mit derselben Fehlermeldung wie bei den anderen Tools.

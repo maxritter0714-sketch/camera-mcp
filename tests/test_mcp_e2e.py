@@ -28,7 +28,10 @@ def config_path(tmp_path: Path) -> Path:
     path = tmp_path / "config.yaml"
     path.write_text(
         "cameras:\n"
-        f"  - {{id: sample, name: Sample, source: {{type: file, path: '{SAMPLE_VIDEO}'}}}}\n",
+        f"  - {{id: sample, name: Sample, source: {{type: file, path: '{SAMPLE_VIDEO}'}}}}\n"
+        "zones:\n"
+        "  sample:\n"
+        "    - {name: all, polygon: [[0, 0], [1, 0], [1, 1], [0, 1]]}\n",
         encoding="utf-8",
     )
     return path
@@ -57,7 +60,7 @@ async def wait_for_camera(client: Client) -> None:
 async def check_tools(client: Client, expected_model: str) -> None:
     """Every tool works, which also proves that nothing but protocol data was on stdout."""
     tools = {tool.name for tool in (await client.list_tools()).tools}
-    assert {"get_camera_info", "get_frame", "detect_objects"} <= tools
+    assert tools == {"get_camera_info", "get_frame", "detect_objects", "count_in_zone"}
 
     await wait_for_camera(client)
 
@@ -70,6 +73,12 @@ async def check_tools(client: Client, expected_model: str) -> None:
     text = detected.content[0]
     assert isinstance(text, TextContent)
     assert json.loads(text.text)["model"] == expected_model
+
+    counted = await client.call_tool("count_in_zone", {"camera_id": "sample", "zone": "all"})
+    assert not counted.is_error
+    text = counted.content[0]
+    assert isinstance(text, TextContent)
+    assert json.loads(text.text)["zone"] == "all"
 
 
 async def test_all_tools_work_over_stdio(config_path: Path) -> None:

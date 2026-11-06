@@ -25,10 +25,14 @@ pytestmark = pytest.mark.anyio
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SAMPLE_VIDEO = (REPO_ROOT / "tests" / "fixtures" / "sample.mp4").as_posix()
 MAX_IMAGE_WIDTH = 200
-TOOLS = {"get_camera_info", "get_frame", "detect_objects"}
+TOOLS = {"get_camera_info", "get_frame", "detect_objects", "count_in_zone"}
 
+# The zone "door" of the test configuration is the triangle above the image diagonal. Neither of
+# these two stands in it.
 PERSON = Detection(label="person", confidence=0.9, bbox=(0.1, 0.2, 0.3, 0.4))
 CUP = Detection(label="cup", confidence=0.5, bbox=(0.5, 0.5, 0.6, 0.6))
+PERSON_AT_DOOR = Detection(label="person", confidence=0.8, bbox=(0.6, 0.1, 0.8, 0.3))
+CUP_AT_DOOR = Detection(label="cup", confidence=0.6, bbox=(0.7, 0.0, 0.9, 0.2))
 
 
 @pytest.fixture
@@ -129,6 +133,12 @@ async def test_parameters_match_the_specification(client: Client) -> None:
         "classes",
         "min_confidence",
         "include_image",
+    }
+    assert set(schemas["count_in_zone"]["properties"]) == {
+        "camera_id",
+        "zone",
+        "classes",
+        "min_confidence",
     }
 
 
@@ -282,6 +292,86 @@ async def test_detect_objects_adds_limited_image_on_request(client: Client) -> N
 
     assert payload(result)["counts"] == {"person": 1, "cup": 1}
     assert decode(images(result)[0]).shape[1] == MAX_IMAGE_WIDTH
+
+
+async def test_detect_objects_lists_the_zone_of_each_detection(
+    client: Client, detector: FakeDetector
+) -> None:
+    detector.detections = [PERSON, PERSON_AT_DOOR]
+
+    detections = payload(await client.call_tool("detect_objects", {"camera_id": "sample"}))[
+        "detections"
+    ]
+
+    assert [d["zones"] for d in detections] == [[], ["door"]]
+
+
+async def test_count_in_zone_counts_only_the_detections_in_the_zone(
+    client: Client, detector: FakeDetector
+) -> None:
+    detector.detections = [PERSON, CUP, PERSON_AT_DOOR, CUP_AT_DOOR]
+
+    response = payload(
+        await client.call_tool("count_in_zone", {"camera_id": "sample", "zone": "door"})
+    )
+
+    assert response["camera_id"] == "sample"
+    assert response["zone"] == "door"
+    assert datetime.fromisoformat(response["timestamp"]).utcoffset() is not None
+    assert response["frame_age_s"] < 5
+    assert response["counts"] == {"person": 1, "cup": 1}
+    assert [d["bbox"] for d in response["detections"]] == [
+        list(PERSON_AT_DOOR.bbox),
+        list(CUP_AT_DOOR.bbox),
+    ]
+
+
+async def test_count_in_zone_filters_classes_and_confidence(
+    client: Client, detector: FakeDetector
+) -> None:
+    detector.detections = [PERSON_AT_DOOR, CUP_AT_DOOR]
+
+    by_class = await client.call_tool(
+        "count_in_zone", {"camera_id": "sample", "zone": "door", "classes": ["cup"]}
+    )
+    by_confidence = await client.call_tool(
+        "count_in_zone", {"camera_id": "sample", "zone": "door", "min_confidence": 0.7}
+    )
+
+    assert payload(by_class)["counts"] == {"cup": 1}
+    assert payload(by_confidence)["counts"] == {"person": 1}
+
+
+async def test_count_in_zone_empty_zone_gives_empty_counts(client: Client) -> None:
+    response = payload(
+        await client.call_tool("count_in_zone", {"camera_id": "sample", "zone": "door"})
+    )
+
+    assert response["counts"] == {}
+    assert response["detections"] == []
+
+
+async def test_count_in_zone_unknown_zone_lists_zones_without_inference(
+    client: Client, detector: FakeDetector
+) -> None:
+    calls_before = len(detector.calls)
+
+    result = await client.call_tool("count_in_zone", {"camera_id": "sample", "zone": "window"})
+
+    assert "Unknown zone 'window' for camera 'sample'. Available zones: door." in error_text(result)
+    assert len(detector.calls) == calls_before
+
+
+async def test_count_in_zone_errors_are_clear(client: Client) -> None:
+    unknown_camera = await client.call_tool("count_in_zone", {"camera_id": "nope", "zone": "door"})
+    offline = await client.call_tool("count_in_zone", {"camera_id": "broken", "zone": "door"})
+    unknown_class = await client.call_tool(
+        "count_in_zone", {"camera_id": "sample", "zone": "door", "classes": ["unicorn"]}
+    )
+
+    assert "Available cameras: broken, sample" in error_text(unknown_camera)
+    assert "Camera 'broken' is offline" in error_text(offline)
+    assert "Unknown classes: unicorn" in error_text(unknown_class)
 
 
 async def test_unexpected_failure_does_not_reach_the_client(

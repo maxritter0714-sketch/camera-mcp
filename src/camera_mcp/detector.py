@@ -11,9 +11,10 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 from camera_mcp.camera_manager import Frame
-from camera_mcp.config import DetectorConfig
+from camera_mcp.config import DetectorConfig, ZoneConfig
 from camera_mcp.schemas import Detection, DetectionResponse
 from camera_mcp.sources import Image
+from camera_mcp.zones import zones_for
 
 MAX_LISTED_CLASSES = 20
 
@@ -169,11 +170,14 @@ def _check_request(
         )
 
 
-def _rounded(detection: Detection) -> Detection:
+def _finished(detection: Detection, zones: Sequence[ZoneConfig]) -> Detection:
+    """Round the values and assign zones, based on the rounded box the caller sees."""
+    bbox = tuple(round(value, 4) for value in detection.bbox)
     return detection.model_copy(
         update={
             "confidence": round(detection.confidence, 3),
-            "bbox": tuple(round(value, 4) for value in detection.bbox),
+            "bbox": bbox,
+            "zones": zones_for(bbox, zones),
         }
     )
 
@@ -185,11 +189,13 @@ def detect_in_frame(
     default_confidence: float,
     classes: Sequence[str] | None = None,
     min_confidence: float | None = None,
+    zones: Sequence[ZoneConfig] = (),
 ) -> DetectionResponse:
     """Run detection and build the response. No or empty ``classes`` means all classes.
 
     Classes are filtered here rather than in the model call, so that every detector shares the
-    same logic: the network runs in full either way.
+    same logic: the network runs in full either way. Each detection lists the ``zones`` that
+    contain its foot point.
 
     Raises:
         DetectorError: If the request is invalid.
@@ -201,7 +207,7 @@ def detect_in_frame(
 
     wanted = set(classes) if classes else None
     detections = sorted(
-        (_rounded(d) for d in output.detections if wanted is None or d.label in wanted),
+        (_finished(d, zones) for d in output.detections if wanted is None or d.label in wanted),
         key=lambda d: d.confidence,
         reverse=True,
     )

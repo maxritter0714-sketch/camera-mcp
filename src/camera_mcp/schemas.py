@@ -44,3 +44,12 @@ class DetectionResponse(_Response):
     inference_ms: float
     counts: dict[str, int]
     detections: list[Detection]
+
+
+class ZoneCountResponse(_Response):
+    camera_id: str
+    zone: str
+    timestamp: AwareDatetime
+    frame_age_s: float
+    counts: dict[str, int]
+    detections: list[Detection]

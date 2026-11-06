@@ -23,7 +23,13 @@ from camera_mcp.config import (
 from camera_mcp.detector import Detector, DetectorError, UltralyticsDetector, detect_in_frame
 from camera_mcp.imaging import ImagingError, annotate, encode_jpeg, resize_to_width
 from camera_mcp.logging_setup import setup_logging
-from camera_mcp.schemas import CameraInfo, CameraInfoResponse, DetectionResponse
+from camera_mcp.schemas import (
+    CameraInfo,
+    CameraInfoResponse,
+    DetectionResponse,
+    ZoneCountResponse,
+)
+from camera_mcp.zones import ZoneError, count_in_zone, find_zone
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +59,7 @@ def _model_readable_errors() -> Iterator[None]:
     """Report anticipated failures to the model. The SDK withholds the text of anything else."""
     try:
         yield
-    except (CameraError, DetectorError, ImagingError) as exc:
+    except (CameraError, DetectorError, ImagingError, ZoneError) as exc:
         raise ToolError(str(exc)) from exc
 
 
@@ -94,6 +100,7 @@ def _detect(
         default_confidence=app.config.detector.default_confidence,
         classes=classes,
         min_confidence=min_confidence,
+        zones=app.config.zones.get(camera_id, []),
     )
 
 
@@ -168,6 +175,23 @@ def create_server(make_detector: DetectorFactory = UltralyticsDetector) -> MCPSe
                 limit = app.config.limits.max_image_width
                 content.append(_jpeg(app, _draw(frame.image, response), limit)[0])
         return content
+
+    @server.tool(name="count_in_zone", annotations=_READ_ONLY)
+    def count_in_zone_tool(
+        ctx: Context,
+        camera_id: str,
+        zone: str,
+        classes: list[str] | None = None,
+        min_confidence: float | None = None,
+    ) -> ZoneCountResponse:
+        """Zählt erkannte Objekte innerhalb einer benannten Zone (z.B. „tuer“). Ein Objekt zählt zur Zone, wenn der Mittelpunkt der Unterkante seiner Box (Fußpunkt) in der Zone liegt. Verfügbare Zonen liefert `get_camera_info`."""  # noqa: E501
+        app = ctx.request_context.lifespan_context
+        with _model_readable_errors():
+            frame = app.cameras.latest_frame(camera_id)
+            # Checked before inference, which is the expensive part.
+            find_zone(app.config.zones.get(camera_id, []), camera_id, zone)
+            response = _detect(app, frame, camera_id, classes, min_confidence)
+        return count_in_zone(response, zone)
 
     return server
 
