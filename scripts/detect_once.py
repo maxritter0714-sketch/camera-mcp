@@ -53,6 +53,7 @@ def run(argv: list[str], make_detector: Callable[[DetectorConfig], Detector]) ->
             frame,
             camera_id,
             default_confidence=config.detector.default_confidence,
+            zones=config.zones.get(camera_id, []),
         )
     except (
         ConfigError,

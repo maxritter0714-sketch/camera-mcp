@@ -37,7 +37,10 @@ def config_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         "cameras:\n"
         "  - id: sample\n"
         "    name: Sample\n"
-        f"    source: {{type: file, path: '{(FIXTURES / 'sample.mp4').as_posix()}', loop: true}}\n",
+        f"    source: {{type: file, path: '{(FIXTURES / 'sample.mp4').as_posix()}', loop: true}}\n"
+        "zones:\n"
+        "  sample:\n"
+        "    - {name: left, polygon: [[0, 0], [0.5, 0], [0.5, 1], [0, 1]]}\n",
         encoding="utf-8",
     )
     monkeypatch.setenv(CONFIG_ENV_VAR, str(path))
@@ -70,6 +73,14 @@ def test_camera_gives_json_on_stdout(detect_once: ModuleType, capsys) -> None:
     assert code == 0
     assert payload["camera_id"] == "sample"
     assert payload["frame_size"] == [320, 240]
+    assert payload["detections"][0]["zones"] == ["left"]
+
+
+@pytest.mark.usefixtures("config_path")
+def test_image_file_has_no_zones(detect_once: ModuleType, capsys) -> None:
+    detect_once.run(["--image", str(FIXTURES / "sample.png")], fake_factory)
+
+    assert json.loads(capsys.readouterr().out)["detections"][0]["zones"] == []
 
 
 @pytest.mark.usefixtures("config_path")
