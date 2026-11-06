@@ -219,15 +219,75 @@ Aus M4 offen geblieben: eine falsche `mouse` (0,62) am rechten Bildrand der Hand
 
 ## 4. LLM-Aufgabenerfolg
 
-Offen. Braucht 10–15 Evaluationsfragen (`docs/eval_questions.md`).
+### Aufbau
 
-Beobachtungen aus dem Robustheitstest, die hier geprüft werden sollen:
+15 Fragen aus `docs/eval_questions.md` zu vier Standbild-Kameras (Zählen, Ja/Nein, Zone, Fragen,
+die ein Bild brauchen, Fragen, bei denen die Erkennung falsch liegt, eine Frage über alle
+Kameras). Jede Frage läuft in einer eigenen, frischen Claude-Code-Sitzung ohne Projektkontext:
 
-- Bei unbekannten Klassen listet die Fehlermeldung nur die ersten 20 der 80 Klassen. Fragt
-  jemand auf Deutsch nach „Maus“, steht `mouse` nicht in der Liste. Ob das Modell die richtige
-  Klasse trotzdem findet, zeigt die Evaluation.
-- „Kamera aus“ meldet „no frame received yet“, ohne die Ursache (Verbindung abgelehnt). Das Modell
-  kann „startet gerade“ und „nicht erreichbar“ nicht unterscheiden.
+```
+claude -p "<Frage>" --mcp-config mcp.json --strict-mcp-config --tools "" \
+  --allowedTools <die vier Kamera-Tools> --setting-sources local \
+  --no-session-persistence --output-format stream-json --verbose
+```
+
+Aus einem leeren Arbeitsordner, ohne eingebaute Tools, ohne Nutzer- und Projekteinstellungen.
+Modell: `claude-opus-5-5`. Aus dem Protokoll werden Tool-Aufrufe, Fehler, Antwort, Dauer und
+Kosten gelesen. Ob eine Antwort stimmt, hat Claude in der entwerfenden Sitzung gegen die erwartete
+Antwort bewertet; Grenzfälle sind unten genannt.
+
+Verglichen wurden zwei Fassungen der Tool-Beschreibungen (Variante A), je 3 Durchgänge:
+
+- **Vorher:** die Beschreibungen aus KONZEPT.md Abschnitt 5 bis M4.
+- **Nachher:** `get_frame` mit Hinweis auf das Breitenlimit; `detect_objects` mit den Schwächen
+  aus Abschnitt 3 und einer Faustregel, wann das Bild zu prüfen ist (Wortlaut in `DESIGN.md`).
+
+### Ergebnis (Mittel pro Durchgang à 15 Fragen)
+
+| | Vorher | Nachher |
+|---|---:|---:|
+| richtige Antworten | 15/15 (45/45) | 15/15 (45/45) |
+| Tool-Aufrufe | 40,3 | 39,0 |
+| Bilder (`get_frame` oder `include_image=true`) | 15,7 | 17,7 |
+| Fragen mit mindestens einem Bild | 12,3 (12, 13, 12) | 13,7 (13, 14, 14) |
+| `get_frame` mit `max_width` > 1024 | 2 | 1 |
+| Tool-Fehler | 0 | 0 |
+| Kosten | 0,60 $ | 0,63 $ |
+| Dauer (alle 15 Fragen nacheinander) | 226 s | 227 s |
+
+Grenzfall: Bei Frage 7 (3 Gabeln) antwortete ein Nachher-Durchgang „2 sicher, wahrscheinlich 3“;
+gewertet als richtig, weil Claude die Unsicherheit benennt und bei 3 landet.
+
+### Beobachtungen
+
+- **Die Fallen erkennt Claude in beiden Fassungen.** Bei Gabeln (Frage 7), Stühlen (12) und der
+  „Uhr“ (13) liefert die Erkennung falsche Werte (1 Gabel, 1 Stuhl, `clock`); Claude prüft in
+  jedem Durchgang das Bild und korrigiert. Die Genauigkeit hängt hier also nicht an der
+  Beschreibung, sondern daran, dass Claude die Ergebnisse von sich aus anzweifelt.
+- **Fragen, die ein Bild brauchen, gehen direkt an `get_frame`** (4, 5, 9, 11). Reine Zählfragen
+  mit klarem Ergebnis bleiben ohne Bild (2, vorher auch 3).
+- **Die neue Beschreibung macht vorsichtiger, nicht sparsamer.** Die Faustregel „Konfidenz unter
+  etwa 0,6“ greift fast immer, weil viele Erkennungen zwischen 0,47 und 0,6 liegen. Frage 3
+  („Sitzt jemand am Schreibtisch?“) bekommt nachher in jedem Durchgang ein Bild, vorher in keinem;
+  Frage 15 alle vier statt im Mittel 3,3 Standbilder. Gespart wurde nur bei 9 und 13, wo Claude
+  das Bild gleich mit `detect_objects` bzw. nur einmal holt statt mit einem zweiten Aufruf.
+- **Der Hinweis auf das Breitenlimit halbiert die vergeblichen Anfragen** mit 2048 bzw. 2400 px
+  (geliefert werden ohnehin 1024 px), verhindert sie aber nicht ganz.
+- **Klassennamen:** Claude übersetzt deutsche Begriffe selbst in COCO-Namen (`mouse`, `fork`,
+  `wine glass`, `chair`); es gab keinen Aufruf mit unbekannter Klasse. Die in Abschnitt 5
+  vermerkte Sorge, dass die gekürzte Klassenliste in der Fehlermeldung stört, trat nicht auf.
+- Die zweite Sorge aus Abschnitt 5 (offline gegenüber „startet gerade“) prüfen diese Fragen nicht,
+  weil sie nur Standbilder nutzen.
+
+### Entscheidung
+
+Übernommen wird nur der Satz zum Breitenlimit bei `get_frame`; `detect_objects` behält die alte
+Beschreibung. Die neue Fassung kostet etwa 5 % mehr und bringt bei gleicher Genauigkeit nichts.
+Die Mischfassung selbst ist nicht gemessen; erwartet wird das Verhalten von „Vorher“ mit weniger
+Anfragen über 1024 px. Begründung und verworfene Varianten in `DESIGN.md`.
+
+Aussagekraft: 3 Durchgänge und 15 Fragen sind wenig, und alle Fragen sind beantwortbar. Die
+Richtung (mehr Bilder nachher) ist aber in jedem einzelnen Durchgang gleich.
 
 ## 5. Robustheit
 

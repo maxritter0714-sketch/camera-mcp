@@ -46,9 +46,26 @@ Tipps für gute Fragen:
 
 ## Läufe
 
-Pro Frage: welche Tools Claude aufgerufen hat (in Reihenfolge), Anzahl der Aufrufe, ob die
-Antwort stimmt.
+Je 3 Durchgänge pro Fassung, Modell `claude-opus-5-5` (Aufbau und Auswertung in
+`EVALUATION.md`, Abschnitt 4). „Tools“ ist die häufigste Reihenfolge, „Aufrufe“ das Mittel über
+die 3 Durchgänge, „richtig?“ die Zahl richtiger Antworten. Kürzel: `info` = `get_camera_info`,
+`detect` = `detect_objects`, `+img` = mit `include_image=true`, `frame` = `get_frame`
+(in Klammern `max_width`, falls über 1024), `zone` = `count_in_zone`.
 
 | # | Vorher: Tools | Aufrufe | richtig? | Nachher: Tools | Aufrufe | richtig? |
 |---|---|---:|---|---|---:|---|
-| 1 | | | | | | |
+| 1 | info, zone, detect (1× zusätzlich frame) | 3,3 | 3/3 | info, zone, detect bzw. info, detect+img | 3,0 | 3/3 |
+| 2 | detect | 1,0 | 3/3 | detect | 1,0 | 3/3 |
+| 3 | info, detect | 2,0 | 3/3 | info, detect, frame | 3,0 | 3/3 |
+| 4 | info, frame | 2,0 | 3/3 | info, detect+img | 2,0 | 3/3 |
+| 5 | info, frame | 2,0 | 3/3 | info, frame | 2,0 | 3/3 |
+| 6 | info, detect+img | 2,0 | 3/3 | info, detect+img | 2,0 | 3/3 |
+| 7 | info, detect+img, frame(2048) | 3,0 | 3/3 | info, detect+img, frame(2048) | 3,0 | 3/3 |
+| 8 | info, detect+img | 2,0 | 3/3 | info, detect+img | 2,0 | 3/3 |
+| 9 | info, frame(2048), detect | 2,7 | 3/3 | info, frame | 2,0 | 3/3 |
+| 10 | info, detect+img | 2,3 | 3/3 | info, detect+img | 2,0 | 3/3 |
+| 11 | info, frame | 2,0 | 3/3 | info, frame | 2,0 | 3/3 |
+| 12 | info, detect+img | 2,3 | 3/3 | info, detect+img | 2,0 | 3/3 |
+| 13 | info, detect, frame | 3,0 | 3/3 | info, detect+img | 2,0 | 3/3 |
+| 14 | info, detect+img | 2,3 | 3/3 | info, detect+img | 2,0 | 3/3 |
+| 15 | info, 4× detect, 3× frame | 8,3 | 3/3 | info, 4× detect, 4× frame | 9,0 | 3/3 |

@@ -121,7 +121,7 @@ Antwort (Beispiel):
 #### `get_frame(camera_id: str, max_width: int = 1024, annotate: bool = False)`
 
 Beschreibung:
-> Liefert das aktuelle Bild einer Kamera. Nur nutzen, wenn du die Szene wirklich sehen musst (z.B. um etwas zu beschreiben, das die Objekterkennung nicht abdeckt). Für Fragen wie „ist jemand da?“ oder „wie viele …?“ ist `detect_objects` schneller und günstiger. Mit `annotate=true` werden erkannte Objekte eingezeichnet.
+> Liefert das aktuelle Bild einer Kamera. Nur nutzen, wenn du die Szene wirklich sehen musst (z.B. um etwas zu beschreiben, das die Objekterkennung nicht abdeckt). Für Fragen wie „ist jemand da?“ oder „wie viele …?“ ist `detect_objects` schneller und günstiger. Mit `annotate=true` werden erkannte Objekte eingezeichnet. Die Breite ist auf einen Höchstwert aus der Konfiguration begrenzt (Standard 1024 px); welche Auflösung geliefert wurde, steht in der Antwort.
 
 Antwort: ein Bild (MCP-Image, JPEG) plus kurzer Text mit Zeitstempel, Originalauflösung, ausgelieferter Auflösung, Frame-Alter. `max_width` ist auf einen Höchstwert aus der Konfiguration begrenzt.
 

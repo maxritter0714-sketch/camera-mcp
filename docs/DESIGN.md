@@ -294,3 +294,26 @@ Verworfen:
 Die erste Handzählung war bei vollen Bildern unvollständig. Claude hat danach alle Bilder angesehen und Korrekturen vorgeschlagen; übernommen wurde nur, was Max bestätigt hat. Jede Änderung steht in `recordings/eval/review_log.txt`. Zählregeln, die dabei festgelegt wurden (Hand zählt als `person`, Gläser ohne Stiel als `cup`, realistische Modelle zählen, stilisierte Figuren nicht), stehen in `EVALUATION.md`.
 
 Verworfen: die erste Zählung unverändert verwenden. Sie hätte viele richtige Erkennungen als Fehler gewertet (26 statt 7 „zu viel“ auf denselben Bildern) und das Modell schlechter dargestellt, als es ist.
+
+### LLM-Evaluation in isolierten Sitzungen
+
+Jede Frage läuft als eigener Aufruf `claude -p` mit nur dem Kamera-Server (`--strict-mcp-config`), ohne eingebaute Tools (`--tools ""`), ohne Nutzer- und Projekteinstellungen (`--setting-sources local`) und aus einem leeren Ordner. So sieht das Modell weder dieses Repository noch die Fragenliste noch frühere Antworten, und die Tool-Aufrufe lassen sich aus `stream-json` auszählen. Das Skript dazu liegt nur lokal, weil es an die Claude-Code-Installation gebunden ist; der Aufruf steht in `EVALUATION.md`.
+
+Verworfen:
+- die Fragen in einer normalen Sitzung stellen: Das Modell sähe die Projektdateien und die erwarteten Antworten.
+- `--bare`: verlangt einen API-Schlüssel, die Anmeldung läuft hier über das Abo.
+- nur ein Durchgang pro Fassung: Die Tool-Wahl schwankt zwischen Durchgängen; 3 zeigen, ob ein Unterschied stabil ist.
+
+### Tool-Beschreibungen nach der Evaluation: nur der Hinweis auf das Breitenlimit
+
+Die Evaluation hat zwei Fassungen verglichen (Zahlen in `EVALUATION.md`, Abschnitt 4). Geändert wurden testweise:
+
+- `get_frame`, angehängt: „Die Breite ist auf einen Höchstwert aus der Konfiguration begrenzt (Standard 1024 px); welche Auflösung geliefert wurde, steht in der Antwort.“
+- `detect_objects`, letzter Satz ersetzt durch: „Die Erkennung übersieht oft kleine, entfernte, verdeckte oder viele gleichartige Objekte und ordnet unbekannte Dinge manchmal einer ähnlichen Klasse zu. Bei einzelnen, gut sichtbaren Objekten mit hoher Konfidenz reicht das Ergebnis; bei vollen Szenen, Konfidenz unter etwa 0,6 oder unplausiblen Klassen die Ergebnisse mit `include_image=true` visuell prüfen.“
+
+Ziel war, dass Claude bei klaren Ergebnissen seltener ein Bild anfordert. Das Gegenteil trat ein: gleiche Genauigkeit (45/45), aber 17,7 statt 15,7 Bilder pro Durchgang und etwa 5 % höhere Kosten, weil die Schwelle von 0,6 bei den meisten Erkennungen greift. Der Satz zum Breitenlimit dagegen stimmt sachlich (der Server begrenzt ohnehin) und hat die vergeblichen Anfragen mit 2048 px halbiert. Übernommen ist deshalb nur dieser Satz, in KONZEPT.md Abschnitt 5 und im Docstring. Die Mischfassung ist nicht eigens gemessen.
+
+Verworfen:
+- beide Änderungen behalten: ehrlicher über die Schwächen, aber teurer ohne Gewinn an Genauigkeit. Claude zweifelt falsche Ergebnisse auch ohne den Hinweis an.
+- alles zurücknehmen: verschenkt den Hinweis auf das Limit, der nachweislich Anfragen spart.
+- die Schwelle im Text senken oder weglassen (Varianten B und C): wäre eine weitere Runde Messungen; für den Prototyp reicht die Erkenntnis, dass die Beschreibung die Bildnutzung steuert, aber nicht in die gewünschte Richtung.

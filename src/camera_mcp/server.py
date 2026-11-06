@@ -140,7 +140,7 @@ def create_server(make_detector: DetectorFactory = UltralyticsDetector) -> MCPSe
     def get_frame(
         ctx: Context, camera_id: str, max_width: int = 1024, annotate: bool = False
     ) -> list[Image | str]:
-        """Liefert das aktuelle Bild einer Kamera. Nur nutzen, wenn du die Szene wirklich sehen musst (z.B. um etwas zu beschreiben, das die Objekterkennung nicht abdeckt). Für Fragen wie „ist jemand da?“ oder „wie viele …?“ ist `detect_objects` schneller und günstiger. Mit `annotate=true` werden erkannte Objekte eingezeichnet."""  # noqa: E501
+        """Liefert das aktuelle Bild einer Kamera. Nur nutzen, wenn du die Szene wirklich sehen musst (z.B. um etwas zu beschreiben, das die Objekterkennung nicht abdeckt). Für Fragen wie „ist jemand da?“ oder „wie viele …?“ ist `detect_objects` schneller und günstiger. Mit `annotate=true` werden erkannte Objekte eingezeichnet. Die Breite ist auf einen Höchstwert aus der Konfiguration begrenzt (Standard 1024 px); welche Auflösung geliefert wurde, steht in der Antwort."""  # noqa: E501
         app = ctx.request_context.lifespan_context
         with _model_readable_errors():
             frame = app.cameras.latest_frame(camera_id)
