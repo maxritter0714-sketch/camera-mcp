@@ -113,7 +113,8 @@ Reproduzierbar mit
   Torbogen). Es sind keine Bilder einer fest montierten Kamera; `count_in_zone` wird damit nicht
   geprüft.
 - **Ein Video** (34 s, 1920×1080) mit fest stehendem Handy vor dem Schreibtisch: Eine Person geht
-  durch den Raum und stellt bei Sekunde 14 eine Tasse neben drei Flaschen ab.
+  durch den Raum, nimmt eine Tasse vom Schreibtisch mit und stellt sie bei Sekunde 15–16 wieder
+  vor drei Flaschen ab.
 - Bilder und Video bleiben lokal in `recordings/eval/` (gitignored, Personen und Kennzeichen
   sichtbar). Ein Bild mit über 20 Modellflugzeugen ist ausgeschlossen, weil es sich nicht
   verlässlich zählen lässt.
@@ -186,21 +187,30 @@ würden das Ergebnis schönen.
 
 ### Video
 
-Ein Bild pro Sekunde bei Schwelle 0,40, verglichen mit den notierten Ereignissen:
+Ein Bild pro Sekunde bei Schwelle 0,40. Die Ereignisse hat Max notiert; Claude hat sie mit den
+Einzelbildern abgeglichen und um die Tasse am Anfang ergänzt (Max hatte sie nicht notiert):
 
-| Zeitraum | Ereignis (notiert) | Erkannt |
+| Zeitraum | Ereignis | Erkannt |
 |---|---|---|
-| 0–8 s | Person geht zur Tür | `person` in jeder Sekunde; bei 0 s (Hand vor der Linse) und 2 s doppelt |
-| 0–14 s | 3 Flaschen auf dem Schreibtisch | `bottle` 3 in jeder Sekunde von 5 bis 14 s; 0–4 s keine (Ursache nicht geprüft) |
-| 14 s | Tasse wird vor den Flaschen abgestellt | — |
-| 15–33 s | Person geht zur Tür und zurück | `person` in jeder Sekunde, bei 16 s und 23 s doppelt |
-| 15–33 s | Tasse und Flaschen stehen da | `cup` nur in der letzten Sekunde; `bottle` nicht mehr bei 0,40 |
+| 0–3 s | Person direkt vor der Kamera (Hand, Beine); **Tasse steht vor den Flaschen** | `person` in jeder Sekunde, bei 0 s und 2 s doppelt; `bottle` keine, `cup` keine |
+| 4 s | Person nimmt die Tasse mit | `person` |
+| 5–14 s | Person geht zur Tür und zurück, die Flaschen sind frei | `person` in jeder Sekunde; `bottle` 3 in jeder Sekunde |
+| 15–16 s | Tasse wird wieder vor den Flaschen abgestellt | `person`, bei 16 s doppelt |
+| 17–32 s | Person geht zur Tür und zurück; Tasse steht vor den Flaschen | `person` in jeder Sekunde, bei 23 s doppelt; `bottle` keine, `cup` keine |
+| 33 s | Kamera wird bewegt | `cup` 1 (aus anderem Blickwinkel) |
 
-- **Personen werden zuverlässig erkannt**, über den ganzen Raum hinweg; gelegentlich doppelt.
-- **Die Tasse ist ein durchsichtiger Glasbecher** und wird fast nie erkannt. Sie steht vor den
-  Flaschen und verdeckt zwei davon. Bei Sekunde 20 erreicht eine Flasche nur noch 0,33, die
-  anderen werden auch bei 0,25 nicht erkannt; vorher (Sekunde 12) lagen alle drei bei 0,50–0,74. Verdeckung und durchsichtige Objekte sind damit die deutlichste Schwäche in der Szene.
-- Für Fragen wie „Steht etwas auf dem Schreibtisch?“ wäre die Antwort ab Sekunde 15 falsch.
+- **Personen werden zuverlässig erkannt**, über den ganzen Raum hinweg und auch, wenn nur Beine
+  oder eine Hand zu sehen sind; gelegentlich doppelt.
+- **Die Tasse wird aus dieser Perspektive nie erkannt**, nur in der letzten Sekunde aus einem
+  anderen Winkel. Es ist ein grauer, strukturierter Becher, der von der Kamera aus vor den Flaschen
+  steht.
+- **Steht die Tasse vor den Flaschen, werden die Flaschen nicht mehr erkannt.** Das passiert zweimal,
+  am Anfang (0–3 s) und nach dem Abstellen (ab 17 s); dazwischen werden alle drei sicher erkannt.
+  Bei Sekunde 20 erreicht eine Flasche nur noch 0,33, die anderen werden auch bei 0,25 nicht
+  erkannt; bei Sekunde 12 lagen alle drei bei 0,50–0,74. Verdeckung ist damit die deutlichste
+  Schwäche in der Szene.
+- Für Fragen wie „Was steht auf dem Schreibtisch?“ wäre die Antwort in 24 von 34 Sekunden falsch
+  (keine Flaschen und keine Tasse erkannt).
 
 ### Nicht weiter untersucht
 
