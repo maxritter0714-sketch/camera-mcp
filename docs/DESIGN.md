@@ -238,3 +238,33 @@ Verworfen:
 `count_in_zone` ruft dieselbe Erkennung auf wie `detect_objects` und behält nur die Detektionen der Zone. `counts` gilt damit nur für die Zone. Die Antwort enthält nach Rückfrage neben den spezifizierten Feldern Zone, Zeitstempel, `counts` und Detektionen auch `camera_id` und `frame_age_s`. So passt sie zu `detect_objects`, und das Modell sieht, wie alt das Ergebnis ist. Ausgeliefert wird sie als strukturierte Ausgabe wie bei `get_camera_info`, weil kein Bild dazugehört.
 
 Die Zone wird vor der Erkennung geprüft. Eine unbekannte Zone liefert eine Fehlermeldung mit den Zonen der Kamera, oder den Hinweis, dass die Kamera keine hat, und kostet keine Inferenz. Eine unbekannte oder ausgefallene Kamera meldet sich mit derselben Fehlermeldung wie bei den anderen Tools.
+
+## M5 – Evaluation (in Arbeit)
+
+### Latenz über echtes MCP statt direkter Funktionsaufrufe
+
+`scripts/benchmark.py` startet den Server als Subprozess und ruft die Tools als MCP-Client über stdio auf, wie es auch `tests/test_mcp_e2e.py` tut. Gemessen wird damit, was ein Client wie Claude erlebt: Protokoll, Serialisierung, der Wechsel in den Worker-Thread, Inferenz und Bildkodierung. `inference_ms` aus der Antwort von `detect_objects` steht daneben, sodass sich der Anteil von Server und Protokoll ablesen lässt. Vor der Messung laufen drei Aufwärmaufrufe pro Fall; die Kamera muss `online` sein.
+
+Verworfen: die Tool-Funktionen direkt im Prozess aufzurufen. Das wäre genauer für die Inferenz allein, ließe aber den Anteil weg, den das Konzept mit „Latenz pro Tool“ meint.
+
+### Bildgrößen ohne das konfigurierte Limit
+
+Der Server begrenzt jedes Bild auf `limits.max_image_width` (Standard 1024 px). Ein Aufruf mit 1600 px liefert also 1024 px. Die Antwortgrößen für 512, 1024 und 1600 px misst das Skript deshalb im Prozess mit denselben Funktionen, die der Server nutzt (`resize_to_width`, `encode_jpeg`), aber ohne das Limit. So bleibt die echte Konfiguration unverändert, und die Messung beantwortet, ob sich ein höheres Limit lohnt.
+
+Verworfen:
+- den Server mit einer Config-Kopie mit höherem Limit starten: misst dann eine Konfiguration, die so nicht betrieben wird.
+- 1600 px weglassen: dann bleibt offen, ob das Limit von 1024 px gut gewählt ist.
+
+### Token-Schätzung für Bilder nach der aktuellen Anthropic-Dokumentation
+
+Bilder kosten ⌈Breite / 28⌉ × ⌈Höhe / 28⌉ Tokens. Größere Bilder verkleinert Claude vorher, je nach Modell auf der Standard-Stufe (1568 px / 1568 Tokens) oder der hochauflösenden Stufe (2576 px / 4784 Tokens, Claude 4.7 und neuer). Das Skript übernimmt die Referenzimplementierung aus der Dokumentation und weist beide Stufen aus; Tests prüfen sie gegen die dort genannten Beispiele. Bei 2000×1500 weichen Tabelle (1269×952) und Referenzimplementierung (1270×952) um ein Pixel voneinander ab; das Skript folgt der Implementierung, die Tokens sind gleich. Text wird grob mit Bytes / 4 geschätzt.
+
+Verworfen: die ältere Faustregel Breite × Höhe / 750 mit Obergrenze ~1600 Tokens. Sie steht noch in älteren Quellen, ist aber überholt und hätte die Kosten bei 1600 px für hochauflösende Modelle falsch angegeben.
+
+### Ausgabe nur in ASCII
+
+Die Markdown-Ausgabe des Skripts enthält nur ASCII-Zeichen. Die Windows-Konsole kodiert stdout mit cp1252 und bricht bei Zeichen wie „≈“ ab. Ein Test prüft das.
+
+### Robustheit: keine neuen Tests, sondern Abgleich und Live-Prüfung
+
+Die Fehlerfälle aus KONZEPT.md Abschnitt 10.5 waren durch die Tests aus M1–M4 bereits abgedeckt. In `EVALUATION.md` steht pro Fall die Antwort, die der Server live über Claude Code gab, und der Test, der das Verhalten festhält. Der Stream-Abbruch wird zusätzlich live mit dem Handy über RTSP geprüft.
