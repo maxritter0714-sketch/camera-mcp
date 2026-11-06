@@ -276,3 +276,21 @@ Die Fehlerfälle aus KONZEPT.md Abschnitt 10.5 waren durch die Tests aus M1–M4
 Verworfen:
 - eine Option in der Config: Für den Prototyp gibt es keinen Fall, der einen anderen Wert braucht; sie wäre ein Parameter über die Spezifikation hinaus.
 - kürzere Werte: Der erste Verbindungsaufbau über RTSP mit H.264 braucht im Test bis zu ~2 s; 5 s lässt genug Reserve für ein langsameres WLAN.
+
+### Erkennungsqualität über Anzahlen statt Boxen
+
+`scripts/evaluate_detection.py` vergleicht pro Bild und Klasse die Anzahl der Erkennungen mit einer Handzählung (`counts.csv`). Das passt zur Frage, die die Tools beantworten („wie viele …?“, `count_in_zone`), und die Referenz lässt sich in Excel ausfüllen. „Übersehen“ und „zu viel“ sind Differenzen der Anzahlen. Eine falsche und eine übersehene Erkennung derselben Klasse im selben Bild heben sich dabei auf; das ist in `EVALUATION.md` genannt.
+
+Jedes Bild wird einmal bei der niedrigsten Schwelle erkannt, die höheren Schwellen filtern dieses Ergebnis. Das ist gleichwertig und viermal schneller. „Klassenzählungen exakt“ bezieht sich für alle Schwellen auf dieselben Paare aus Bild und Klasse, nämlich die, bei denen Referenz oder Erkennung bei der niedrigsten Schwelle über 0 liegt. Ein erster Entwurf nahm pro Schwelle eine eigene Bezugsmenge; die Prozente waren dadurch nicht vergleichbar. Paare, die überall 0 sind, zählen nicht, weil sie das Ergebnis schönen würden.
+
+Erkennungen von Klassen ohne Spalte in der Referenz werden als „andere Klassen“ getrennt gezählt, nicht als Fehler. So muss die Referenz nicht alle 80 Klassen abdecken.
+
+Verworfen:
+- Boxen von Hand zeichnen und mAP bzw. Precision/Recall mit IoU berechnen: genauer, aber ein Vielfaches an Aufwand für die Referenz und ein zusätzliches Werkzeug. Für einen Prototyp, dessen Tools Anzahlen liefern, nicht nötig.
+- getrennte Inferenz pro Schwelle: gleiches Ergebnis, viermal langsamer.
+
+### Kontrolldurchgang der Handzählung
+
+Die erste Handzählung war bei vollen Bildern unvollständig. Claude hat danach alle Bilder angesehen und Korrekturen vorgeschlagen; übernommen wurde nur, was Max bestätigt hat. Jede Änderung steht in `recordings/eval/review_log.txt`. Zählregeln, die dabei festgelegt wurden (Hand zählt als `person`, Gläser ohne Stiel als `cup`, realistische Modelle zählen, stilisierte Figuren nicht), stehen in `EVALUATION.md`.
+
+Verworfen: die erste Zählung unverändert verwenden. Sie hätte viele richtige Erkennungen als Fehler gewertet (26 statt 7 „zu viel“ auf denselben Bildern) und das Modell schlechter dargestellt, als es ist.

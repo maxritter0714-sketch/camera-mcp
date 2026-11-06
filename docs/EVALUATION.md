@@ -7,7 +7,7 @@ Gliederung nach KONZEPT.md, Abschnitt 10. Messungen sind reproduzierbar mit
 |---|---|---|
 | 1 | Latenz pro Tool | CPU gemessen; GPU folgt in M6 |
 | 2 | Antwortgröße | gemessen |
-| 3 | Erkennungsqualität | offen, wartet auf Testbilder mit Handzählung |
+| 3 | Erkennungsqualität | gemessen: 37 Bilder mit Handzählung, ein Video |
 | 4 | LLM-Aufgabenerfolg | offen, wartet auf Evaluationsfragen |
 | 5 | Robustheit | live geprüft, Fehlerfälle und Stream-Abbruch über HTTP und RTSP |
 
@@ -102,13 +102,110 @@ das konfigurierte Limit `max_image_width: 1024`. So ist auch 1600 px vergleichba
 
 ## 3. Erkennungsqualität
 
-Offen. Braucht 30–50 eigene Testbilder mit von Hand gezählten Objekten (KONZEPT.md, Abschnitt 9).
+Reproduzierbar mit
+`uv run python scripts/evaluate_detection.py [--video <datei> --events <datei>] [--json <datei>]`.
 
-Erste Hinweise aus M4, die hier geprüft werden sollen:
+### Material
 
-- Eine falsche „mouse“ mit Konfidenz 0,62 am rechten Bildrand der Handy-Kamera.
-- „tv“ erreicht auf dem Standbild 0,50, live 0,70–0,76; vermutlich wegen der erneuten
-  JPEG-Kompression des Standbilds.
+- **37 eigene Fotos** (Handy, Originaldateien, 1440–4640 px), Alltagsmotive: Restaurant und Essen,
+  Autos, Flugplatz und Flugzeugmuseum, Museumsvitrinen, Gegenstände in der Hand. 16 davon enthalten
+  keine der gezählten Klassen und dienen als **Negativ-Set** (z. B. Armbanduhren, Säbel, Kerzen,
+  Torbogen). Es sind keine Bilder einer fest montierten Kamera; `count_in_zone` wird damit nicht
+  geprüft.
+- **Ein Video** (34 s, 1920×1080) mit fest stehendem Handy vor dem Schreibtisch: Eine Person geht
+  durch den Raum und stellt bei Sekunde 14 eine Tasse neben drei Flaschen ab.
+- Bilder und Video bleiben lokal in `recordings/eval/` (gitignored, Personen und Kennzeichen
+  sichtbar). Ein Bild mit über 20 Modellflugzeugen ist ausgeschlossen, weil es sich nicht
+  verlässlich zählen lässt.
+
+### Referenz (Handzählung)
+
+- Gezählt wurde die **Anzahl pro Bild und Klasse** für 23 COCO-Klassen, nicht die Position der
+  Boxen. Verglichen wird deshalb nur die Anzahl; „übersehen“ und „zu viel“ sind Differenzen der
+  Anzahlen, keine Zuordnung einzelner Boxen.
+- Regeln: Ein Objekt zählt, wenn es am sichtbaren Teil erkennbar ist, auch angeschnitten oder
+  verdeckt. Eine Hand oder ein anderer Körperteil zählt als `person`. Gläser ohne Stiel zählen als
+  `cup`. Realistische Modelle (Flugzeugmodelle) zählen als ihre Klasse, stilisierte Figuren
+  (Holzkrippe) nicht. Objekte ohne COCO-Klasse (Armbanduhr, Hubschrauber, Säbel) stehen nur als
+  Notiz in der Referenz.
+- COCO-Klassen ohne eigene Spalte (z. B. `vase`, `boat`, `microwave`) zählen nicht als Fehler,
+  sondern werden als „andere Klassen“ getrennt ausgewiesen.
+- **Ablauf:** Max hat zuerst ohne Kenntnis der Modellergebnisse gezählt. Danach hat Claude alle
+  Bilder angesehen und Korrekturen vorgeschlagen; Max hat sie bestätigt
+  (`recordings/eval/review_log.txt`). Zwei Werte hat nur Claude gezählt (7 Stühle, 5 Bücher).
+- **Einfluss des Kontrolldurchgangs:** Er wurde ausgelöst durch die zusätzlichen Erkennungen des
+  Modells und hat vor allem diese bestätigt (z. B. Wassergläser, Hände, weitere Autos). Er hat aber
+  auch Objekte ergänzt, die das Modell übersieht (2 Einweiser, eine zweite Person, 5 Bücher,
+  7 Stühle). Auf den 29 ursprünglich gezählten Bildern bei Schwelle 0,40:
+
+  | | Objekte in der Referenz | übersehen | zu viel |
+  |---|---:|---:|---:|
+  | vor dem Kontrolldurchgang | 66 | 36 | 26 |
+  | danach | 103 | 54 | 7 |
+
+  Die erste Zählung war also unvollständig, vor allem bei vollen Bildern. Weil gezielt die
+  zusätzlichen Erkennungen geprüft wurden, ist „zu viel“ eher zu niedrig angesetzt: Eine falsche
+  Erkennung, die einem übersehenen echten Objekt gleicher Klasse gegenübersteht, fällt beim
+  Vergleich der Anzahlen nicht auf.
+
+### Ergebnis (`yolo26n.pt`, CPU, `imgsz` 640)
+
+| Schwelle | Bilder exakt | Klassenzählungen exakt | mittl. abs. Fehler | Referenz | erkannt | übersehen | zu viel | andere Klassen |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 0,25 | 12/37 (32 %) | 24/68 (35 %) | 1,18 | 110 | 100 | 45 | 35 | 5 |
+| **0,40** | **19/37 (51 %)** | **37/68 (54 %)** | **0,97** | 110 | 62 | 57 | 9 | 4 |
+| 0,50 | 20/37 (54 %) | 34/68 (50 %) | 1,09 | 110 | 48 | 68 | 6 | 1 |
+| 0,60 | 17/37 (46 %) | 29/68 (43 %) | 1,24 | 110 | 38 | 78 | 6 | 1 |
+
+„Klassenzählungen exakt“ bezieht sich für alle Schwellen auf dieselben 68 Paare aus Bild und
+Klasse, bei denen die Referenz oder die Erkennung bei 0,25 über 0 liegt. Paare, die überall 0 sind,
+würden das Ergebnis schönen.
+
+**Beobachtungen**
+
+- **Die Standardschwelle 0,40 ist gut gewählt.** Sie hat den kleinsten mittleren Fehler und die
+  meisten exakten Klassenzählungen. Darunter steigen die falschen Erkennungen stark (35 bei 0,25),
+  darüber werden schnell mehr Objekte übersehen.
+- **Das Modell übersieht viel, erfindet aber wenig.** Bei 0,40 werden etwa die Hälfte der
+  Objekte der Referenz nicht gefunden (57 von 110), aber nur 9 zusätzlich gezählt. Für die
+  Nutzung heißt das: Ein „ja, da ist X“ ist recht verlässlich, ein „kein X zu sehen“ deutlich
+  weniger.
+- **Vor allem kleine, entfernte und viele gleiche Objekte fehlen:** 15 Personen im Museum →
+  5 erkannt; 6 Flugzeuge auf dem Flugplatz → 1; Besteck 9 → 3; Stühle im Hintergrund 7 → 1;
+  angeschnittene Buchrücken 5 → 0. Typisch für das kleinste Modell (`n`) bei 640 px Eingangsgröße,
+  auf die auch 4000-px-Fotos verkleinert werden.
+- **Gut erkannt:** große, freistehende Objekte (Autos im Vordergrund, Weingläser, Wassergläser,
+  Tastatur).
+- **Objekte außerhalb der COCO-Klassen werden zur ähnlichsten Klasse:** Desktop-PC → `microwave`,
+  Kerzen und Holzkrippe → `cake`, rohes Steak → `pizza`, Kochfeld → `oven`, Torbogen →
+  `parking meter`, Radarkuppel → `kite`. Die meisten falschen Erkennungen auf den
+  16 Negativ-Bildern sind solche Verwechslungen. Für ein LLM, das nur die Klassen sieht, ist das nicht vom echten Objekt zu
+  unterscheiden; ein Bild (`include_image`) hilft hier.
+- **Hände werden meist als `person` erkannt** (Goldbarren, Motor, Medaille), einmal doppelt
+  (Camembert: 2 statt 1).
+
+### Video
+
+Ein Bild pro Sekunde bei Schwelle 0,40, verglichen mit den notierten Ereignissen:
+
+| Zeitraum | Ereignis (notiert) | Erkannt |
+|---|---|---|
+| 0–8 s | Person geht zur Tür | `person` in jeder Sekunde; bei 0 s (Hand vor der Linse) und 2 s doppelt |
+| 0–14 s | 3 Flaschen auf dem Schreibtisch | `bottle` 3 in jeder Sekunde von 5 bis 14 s; 0–4 s keine (Ursache nicht geprüft) |
+| 14 s | Tasse wird vor den Flaschen abgestellt | — |
+| 15–33 s | Person geht zur Tür und zurück | `person` in jeder Sekunde, bei 16 s und 23 s doppelt |
+| 15–33 s | Tasse und Flaschen stehen da | `cup` nur in der letzten Sekunde; `bottle` nicht mehr bei 0,40 |
+
+- **Personen werden zuverlässig erkannt**, über den ganzen Raum hinweg; gelegentlich doppelt.
+- **Die Tasse ist ein durchsichtiger Glasbecher** und wird fast nie erkannt. Sie steht vor den
+  Flaschen und verdeckt zwei davon. Bei Sekunde 20 erreicht eine Flasche nur noch 0,33, die
+  anderen werden auch bei 0,25 nicht erkannt; vorher (Sekunde 12) lagen alle drei bei 0,50–0,74. Verdeckung und durchsichtige Objekte sind damit die deutlichste Schwäche in der Szene.
+- Für Fragen wie „Steht etwas auf dem Schreibtisch?“ wäre die Antwort ab Sekunde 15 falsch.
+
+### Nicht weiter untersucht
+
+Aus M4 offen geblieben: eine falsche `mouse` (0,62) am rechten Bildrand der Handy-Kamera und
+`tv` mit 0,50 auf dem Standbild gegenüber 0,70–0,76 live.
 
 ## 4. LLM-Aufgabenerfolg
 
