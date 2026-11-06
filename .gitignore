@@ -16,5 +16,6 @@ dist/
 .pytest_cache/
 .ruff_cache/
 
-# Claude Code session logs (kept in the vault)
-.claude/sessions/
+# Local Claude Code state and personal notes
+.claude/
+notes/
