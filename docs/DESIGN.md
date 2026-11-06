@@ -192,3 +192,14 @@ Verworfen: Modellpfad relativ zur Config auflösen – mehr Code für einen Fall
 ### Beschreibungen gegen KONZEPT.md getestet
 
 Die Tool-Beschreibungen sind Teil des Designs (CLAUDE.md, Regel 6). `test_tools.py` liest sie aus KONZEPT.md Abschnitt 5 und vergleicht sie mit dem, was ein echter Client sieht. Ändert sich eines von beiden, schlägt der Test fehl. Das hilft auch beim Vorher-Nachher-Vergleich der Beschreibungen in M5.
+
+### Abnahme mit Claude Code statt Claude Desktop (Abweichung vom Abnahmekriterium)
+
+KONZEPT.md verlangt für M3, dass Claude Desktop die Tools nutzen kann. Die Abnahme lief nach Rückfrage mit Claude Code als echtem Client (`claude mcp add camera -- uv --directory <projektordner> run camera-mcp`). Dort rief das Modell `get_camera_info` auf und gab die Kamera aus der Config korrekt wieder.
+
+Claude Desktop (Windows, Store-/MSIX-Installation) startete den Server nicht. Die App versuchte es nicht einmal, es entstand keine `mcp-server-camera.log`. Bis Version 2.x protokollierte sie beim Start, dass sie `claude_desktop_config.json` im virtualisierten Paketordner liest. Seit dem Update auf 3.x fehlt dieser Eintrag, und der dort eingetragene Server wird ignoriert. Öffentliche Fehlerberichte beschreiben dasselbe Verhalten der Store-Version, ohne eine Lösung zu nennen. Der Server selbst ist nicht die Ursache: Mit genau dem Befehl aus der Desktop-Konfiguration startet er und beantwortet alle drei Tools.
+
+Offen: die Abnahme in Claude Desktop nachholen, z. B. mit einer anderen Version oder Installationsart. Das gilt auch für die gleichlautenden Kriterien in M4 und M6.
+
+Verworfen: den Server als Desktop-Erweiterung verpacken, die die Store-Version lädt. Das wäre ein zusätzliches Paketformat außerhalb der Spezifikation, nur um einen Fehler des Clients zu umgehen.
+
